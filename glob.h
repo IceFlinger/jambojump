@@ -9,6 +9,7 @@
 #define SCROLL_BOUND_R 175
 #define SCROLL_BOUND_U 250
 #define SCROLL_BOUND_D 125
+#define SCREEN_FPS 60
 
 
 #endif

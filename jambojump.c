@@ -66,10 +66,30 @@ bool load(){
 
 void draw(){
 	SDL_FillRect( surface, NULL, SDL_MapRGB( surface->format, background_color[0], background_color[1], background_color[2]) );
-	for(int i = 0; i < SOLID_COUNT; i++){
-		if(map[i].w != 0){
-			SDL_Rect solidRect = {map[i].x - scrollPosX, map[i].y - scrollPosY, map[i].w, map[i].h};
-			SDL_FillRect( surface, &solidRect, SDL_MapRGB( surface->format, solid_color[0],solid_color[1], solid_color[2]) );
+	if(ENABLE_GRID){
+		int horzLines = ceil(SCREEN_WIDTH/PLAYER_SIZE);
+		int vertLines = ceil(SCREEN_HEIGHT/PLAYER_SIZE);
+		SDL_Renderer *renderer = SDL_CreateSoftwareRenderer(surface);
+		SDL_SetRenderDrawColor( renderer, grid_color[0], grid_color[1], grid_color[2] , 0xFF); 
+		for (int i = 0; i <= horzLines; i++){
+			float x1 = PLAYER_SIZE*i - (int)scrollPosX%PLAYER_SIZE;
+			float y1 = 0;
+			float x2 = PLAYER_SIZE*i - (int)scrollPosX%PLAYER_SIZE;
+			float y2 = SCREEN_HEIGHT - (int)scrollPosY%PLAYER_SIZE;
+			SDL_RenderDrawLine( renderer, x1, y1, x2, y2);
+		}
+		for (int i = 0; i <= vertLines; i++){
+			float x1 = 0;
+			float y1 = PLAYER_SIZE*i- (int)scrollPosY%PLAYER_SIZE;
+			float x2 = SCREEN_WIDTH- (int)scrollPosX%PLAYER_SIZE;
+			float y2 = PLAYER_SIZE*i- (int)scrollPosY%PLAYER_SIZE;
+			SDL_RenderDrawLine( renderer, x1, y1, x2, y2);
+		}
+		for(int i = 0; i < SOLID_COUNT; i++){
+			if(map[i].w != 0){
+				SDL_Rect solidRect = {map[i].x - scrollPosX, map[i].y - scrollPosY, map[i].w, map[i].h};
+				SDL_FillRect( surface, &solidRect, SDL_MapRGB( surface->format, solid_color[0],solid_color[1], solid_color[2]) );
+			}
 		}
 	}
 	player_draw(&player, surface, scrollPosX, scrollPosY);
@@ -157,7 +177,7 @@ int main( int argc, char* args[] )
 			{
 				float timeout =SDL_GetTicks() + ((1000/SCREEN_FPS)-frameticks);
 				while (!SDL_TICKS_PASSED(SDL_GetTicks(), timeout)) {
-					//stuff to do while game is running might be good here?
+					//player_debug(&player);
 				}
 			}
 		//Calculate and correct fps
@@ -165,7 +185,7 @@ int main( int argc, char* args[] )
 		if( avgFPS > 2000000 ){
 			avgFPS = 0;
 		} //need some kind of in-window console output for debuggings
-		printf("%d/%f=%f:%f;%f\r", countedFrames,tickstart,avgFPS,scrollPosX,scrollPosY);
+		//printf("%d/%f=%f:%f;%f\r", countedFrames,tickstart,avgFPS,scrollPosX,scrollPosY);
 		countedFrames++;
 	}
 	printf("\nExiting...");

@@ -17,16 +17,16 @@ bool player_initplayer(Player *player){
 		0,				//velX
 		0,				//targVelX
 		1.5,			//velchangeX
-		5,				//gravX
+		0,				//gravX
 		0,				//targCountX
 		0,				//jumpChangeX
 
 		PLAYER_SPAWNY,	//spawnY
 		PLAYER_SPAWNY,	//posY
 		0,				//velY
-		10.0,			//gravY
+		PLAYER_AIR_GRAV,//gravY
 		0,				//targVelY
-		1.2,			//velchangeY
+		1.2,			//velchangeY 1.2
 		0,				//targCountY
 
 		PLAYER_SPEED,	//speed
@@ -39,6 +39,7 @@ bool player_initplayer(Player *player){
 		false,			//lastRight
 		false,			//run
 		false,			//canJump
+		false,			//bhop
 		false,			//inAir
 		0,				//timeAlive
 		PLAYER_SIZE 	//size
@@ -121,87 +122,68 @@ bool player_step(Player *player, SDL_Rect *map){
 	}
 
 	if(!(player->up) && player->lastUp && (player->velY < 0.0) && (player->jumpChangeX == 0.0)){
-		//what the fuck
-		player->velY = -2.0; //??????
+		//Reduce our upwards speed if we release the button while rising
+		player->velY = PLAYER_EARLY_DROP_SPEED; 
 	}
 	if(!(player->left)&&!(player->right)&&!(player->inAir)){
+		//quickly stop if we're on the ground and not inputting a direction
 		player->targCountX = 0.0;
 	}
 
 	player->lastUp = player->up;
 	player->lastLeft = player->left;
 	player->lastRight = player->right;
-
-	if(player->velY < player->targVelY){
+	
+	if(player->velY != player->targVelY){
 		if (player->targCountY == 0.0){
-			player->targCountY = 0.5;
+			player->targCountY = PLAYER_VETICAL_FRICTION;//0.5
 		} else{
 			player->targCountY *= player->velChangeY;
 		}
 		float oldVelY = player->velY;
-		player->velY += player->targCountY;
-		if (oldVelY * player->velY < 0.0){
-			player->targCountY = 0.0;
-		}
-		if(player->velY > player->targVelY){
-			player->velY = player->targVelY;
-			player->targCountY = 0.0;
-		}
-	}
-	if(player->velY > player->targVelY){
-		if (player->targCountY == 0.0){
-			player->targCountY = 0.5;
-		} else{
-			player->targCountY *= player->velChangeY;
-		}
-		float oldVelY = player->velY;
-		player->velY -= player->targCountY;
-		if (oldVelY * player->velY < 0.0){
-			player->targCountY = 0.0;
-		}
 		if(player->velY < player->targVelY){
-			player->velY = player->targVelY;
+			player->velY += player->targCountY;
+			if(player->velY > player->targVelY){
+				player->velY = player->targVelY;
+				player->targCountY = 0.0;
+			}
+		} else {
+			player->velY -= player->targCountY;
+			if(player->velY < player->targVelY){
+				player->velY = player->targVelY;
+				player->targCountY = 0.0;
+			}
+		}
+		if (oldVelY * player->velY < 0.0){
 			player->targCountY = 0.0;
 		}
 	}
-
-	if (player->velX < player->targVelX){
+	
+	if (player->velX != player->targVelX){
 		if(player->targCountX == 0.0)
 		{
-			player->targCountX = 0.2;
+			player->targCountX = PLAYER_HORIZONTAL_TURN_FRICTION;
 			if (player->targVelX == 0.0){
-				player->targCountX = 0.6;
+				player->targCountX = PLAYER_HORIZONTAL_FRICTION;
 			}
 		} else {
 			player->targCountX *= player->velChangeX;
 		}
 		float oldVelX = player->velX;
-		player->velX += player->targCountX;
-		if(oldVelX * player->velX < 0.0){
-			player->targCountX = 0.0;
-		}
-		if(player->velX > player->targVelX){
-			player->velX = player->targVelX;
-			player->targCountX = 0.0;
-		}
-	}
-	if (player->velX > player->targVelX){
-		if(player->targCountX == 0.0)
-		{
-			player->targCountX = 0.2;
-			if (player->targVelX == 0.0){
-				player->targCountX = 0.6;
+		if (player->velX < player->targVelX){
+			player->velX += player->targCountX;
+			if(player->velX > player->targVelX){
+				player->velX = player->targVelX;
+				player->targCountX = 0.0;
 			}
 		} else {
-			player->targCountX *= player->velChangeX;
+			player->velX -= player->targCountX;
+			if(player->velX < player->targVelX){
+				player->velX = player->targVelX;
+				player->targCountX = 0.0;
+			}
 		}
-		float oldVelX = player->velX;
-		player->velX -= player->targCountX;
 		if(oldVelX * player->velX < 0.0){
-			player->targCountX = 0.0;
-		}
-		if(player->velX < player->targVelX){
-			player->velX = player->targVelX;
 			player->targCountX = 0.0;
 		}
 	}
@@ -236,25 +218,25 @@ bool player_step(Player *player, SDL_Rect *map){
 					else if((oldX+player->size)<=map[i].x){
 						//printf("left\n");
 						player->posX = map[i].x - player->size;
-						player->gravX = 1.0;
+						player->gravX = PLAYER_WALLJUMP_MOMENTUM;
 						player->targCountX = 0.0;
 						if (!collided){
-							player->jumpChangeX = -5.0;
+							player->jumpChangeX = -PLAYER_WALLJUMP_XSPEED;
 							collided = true;
 						}
-						player->velX = 0.01; //stick towards the wall
+						player->velX = PLAYER_WALL_STICKINESS; //stick towards the wall
 					}
 					//right edge
 					else if(oldX>=(map[i].x + map[i].w)){
 						//printf("right\n");
 						player->posX = map[i].x + map[i].w;
-						player->gravX = -1.0;
+						player->gravX = -PLAYER_WALLJUMP_MOMENTUM;
 						player->targCountX = 0.0;
 						if(!collided){
-							player->jumpChangeX = 5.0;
+							player->jumpChangeX = PLAYER_WALLJUMP_XSPEED;
 							collided = true;
 						}
-						player->velX = -0.01; //works anywhere between 0.01 and 1.9 but not more?
+						player->velX = -PLAYER_WALL_STICKINESS; //works anywhere between 0.01 and 1.9 but not more?
 					}
 				}
 			}
@@ -262,22 +244,35 @@ bool player_step(Player *player, SDL_Rect *map){
 	}
 	if(collided){
 		if(!player->lastUp){
+			//avoid bouncing
+			player->canJump = true;
+		} else if (player->bhop) {
+			//allow one bounce if we previously flagged a bhop
 			player->canJump = true;
 		} else {
 			player->canJump = false;
 		}
+		player->bhop = false;
 		if (player->jumpChangeX == 0.0){
 			player->gravX = 0.0;
 		}
 		player->velChangeX = 2.0;
 		player->inAir = false;
+		player->gravY = PLAYER_WALL_GRAV;
 	} else {
 		player->canJump = false;
+		//not holding jump and falling, enable bhop next landing
+		//if(!(player->up)&&(player->velY > 0)){
+		if(!(player->up)){
+			player->bhop = true;
+		}
 		player->gravX = 0.0;
 		player->velChangeX = 1.0;
 		player->inAir = true;
+		player->gravY = PLAYER_AIR_GRAV;
 	}
 	//printf("Checked collision\n");
+
 };
 
 void player_die(Player *player){
@@ -286,6 +281,43 @@ void player_die(Player *player){
 	player->velX = 0.0;
 	player->velY = 0.0;
 	player->timeAlive = 0;
+}
+
+void player_debug(Player *player){
+	if(PLAYER_DEBUG){
+		printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+		printf("spawnX: %f\n", player->spawnX );
+		printf("posX: %f\n", player->posX );
+		printf("velX: %f\n", player->velX );
+		printf("targVelX: %f\n", player->targVelX );
+		printf("velChangeX: %f\n", player->velChangeX );
+		printf("gravX: %f\n", player->gravX );
+		printf("targCountX: %f\n", player->targCountX );
+		printf("jumpChangeX: %f\n", player->jumpChangeX );
+
+		printf("spawnY: %f\n", player->spawnY );
+		printf("posY: %f\n", player->posY );
+		printf("velY: %f\n", player->velY );
+		printf("gravY: %f\n", player->gravY );
+		printf("targVelY: %f\n", player->targVelY );
+		printf("velChangeY: %f\n", player->velChangeY );
+		printf("targCountY: %f\n", player->targCountY );
+
+		printf("speed: %f\n", player->speed );
+		printf("up: %d\n", player->up );
+		printf("down: %d\n", player->down );
+		printf("left: %d\n", player->left );
+		printf("right: %d\n", player->right );
+		printf("lastUp: %d\n", player->lastUp );
+		printf("lastLeft: %d\n", player->lastLeft );
+		printf("lastRight: %d\n", player->lastRight );
+		printf("run: %d\n", player->run );
+		printf("canJump: %d\n", player->canJump );
+		printf("bhop: %d\n", player->bhop );
+		printf("inAir: %d\n", player->inAir );
+		printf("timeAlive: %d\n", player->timeAlive );
+		printf("size: %d\n", player->size );
+	}
 }
 
 float player_posX(Player *player){

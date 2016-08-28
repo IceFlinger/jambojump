@@ -4,12 +4,15 @@
 #include "glob.h"
 #include "player.h"
 
-const float SCREEN_FPS = 60;
+//const float SCREEN_FPS = 60;
 //const int SCREEN_TICKS_PER_FRAME = 1000 / SCREEN_FPS;
+
+#define ENABLE_GRID true
 
 int used_solids = 0;
 
 char const background_color[] = {0xd9,0xd9,0xd9};
+char const grid_color[] = {0xd0,0xd0,0xd0};
 char const solid_color[] = {0x00,0x00,0x00};
 
 bool running = false;
