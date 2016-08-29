@@ -10,6 +10,14 @@
 char const player_color[] = {0x00,0x00,0xc0};
 char const player_border[] = {0x4d,0x4d,0xff};
 
+bool player_initsprite(Player *player){
+	player->sprite = SDL_CreateRGBSurface(0,player->size,player->size,32,0, 0,0,0);
+	SDL_Renderer *renderer = SDL_CreateSoftwareRenderer(player->sprite);
+	SDL_FillRect(player->sprite, NULL, SDL_MapRGB(player->sprite->format, player_color[0], player_color[1], player_color[2]));
+	SDL_SetRenderDrawColor( renderer, player_border[0], player_border[1], player_border[2] , 0xFF); 
+	SDL_RenderDrawRect( renderer, NULL );
+}
+
 bool player_initplayer(Player *player){
 	bool success = true;
 	Player newplayer = {NULL, //sprite
@@ -46,11 +54,7 @@ bool player_initplayer(Player *player){
 		PLAYER_SIZE 	//size
 	};
 	*player = newplayer;
-	player->sprite = SDL_CreateRGBSurface(0,player->size,player->size,32,0, 0,0,0);
-	SDL_Renderer *renderer = SDL_CreateSoftwareRenderer(player->sprite);
-	SDL_FillRect(player->sprite, NULL, SDL_MapRGB(player->sprite->format, player_color[0], player_color[1], player_color[2]));
-	SDL_SetRenderDrawColor( renderer, player_border[0], player_border[1], player_border[2] , 0xFF); 
-	SDL_RenderDrawRect( renderer, NULL );
+	player_initsprite(player);
 	if( player->sprite == NULL )
 	{
 		printf( "Unable to load player sprite! SDL Error: %s\n", SDL_GetError() );
@@ -284,45 +288,39 @@ void player_die(Player *player){
 	player->timeAlive = 0;
 }
 
-void player_debug(Player *player){
+void player_debug(Player *player, char *buffer){
 	if(PLAYER_DEBUG){
-		printf("\n\n\n\n\n\n\n\n\n\n\n\nspawnX: %f\n", player->spawnX );
-		printf("posX: %f\n", player->posX );
-		printf("velX: %f\n", player->velX );
-		printf("targVelX: %f\n", player->targVelX );
-		printf("velChangeX: %f\n", player->velChangeX );
-		printf("gravX: %f\n", player->gravX );
-		printf("targCountX: %f\n", player->targCountX );
-		printf("jumpChangeX: %f\n", player->jumpChangeX );
+		sprintf(buffer + strlen(buffer), "spawnX: %f\n", player->spawnX );
+		sprintf(buffer + strlen(buffer), "posX: %f\n", player->posX );
+		sprintf(buffer + strlen(buffer), "velX: %f\n", player->velX );
+		sprintf(buffer + strlen(buffer), "targVelX: %f\n", player->targVelX );
+		sprintf(buffer + strlen(buffer), "velChangeX: %f\n", player->velChangeX );
+		sprintf(buffer + strlen(buffer), "gravX: %f\n", player->gravX );
+		sprintf(buffer + strlen(buffer), "targCountX: %f\n", player->targCountX );
+		sprintf(buffer + strlen(buffer), "jumpChangeX: %f\n", player->jumpChangeX );
 
-		printf("spawnY: %f\n", player->spawnY );
-		printf("posY: %f\n", player->posY );
-		printf("velY: %f\n", player->velY );
-		printf("gravY: %f\n", player->gravY );
-		printf("targVelY: %f\n", player->targVelY );
-		printf("velChangeY: %f\n", player->velChangeY );
-		printf("targCountY: %f\n", player->targCountY );
+		sprintf(buffer + strlen(buffer), "spawnY: %f\n", player->spawnY );
+		sprintf(buffer + strlen(buffer), "posY: %f\n", player->posY );
+		sprintf(buffer + strlen(buffer), "velY: %f\n", player->velY );
+		sprintf(buffer + strlen(buffer), "gravY: %f\n", player->gravY );
+		sprintf(buffer + strlen(buffer), "targVelY: %f\n", player->targVelY );
+		sprintf(buffer + strlen(buffer), "velChangeY: %f\n", player->velChangeY );
+		sprintf(buffer + strlen(buffer), "targCountY: %f\n", player->targCountY );
 
-		printf("speed: %f\n", player->speed );
-		printf("up: %d\n", player->up );
-		printf("down: %d\n", player->down );
-		printf("left: %d\n", player->left );
-		printf("right: %d\n", player->right );
-		printf("lastUp: %d\n", player->lastUp );
-		printf("lastLeft: %d\n", player->lastLeft );
-		printf("lastRight: %d\n", player->lastRight );
-		printf("run: %d\n", player->run );
-		printf("canJump: %d\n", player->canJump );
-		printf("bhop: %d\n", player->bhop );
-		printf("inAir: %d\n", player->inAir );
-		printf("timeAlive: %d\n", player->timeAlive );
-		printf("size: %d\n", player->size );
+		sprintf(buffer + strlen(buffer), "speed: %f\n", player->speed );
+		sprintf(buffer + strlen(buffer), "up: %d\n", player->up );
+		sprintf(buffer + strlen(buffer), "down: %d\n", player->down );
+		sprintf(buffer + strlen(buffer), "left: %d\n", player->left );
+		sprintf(buffer + strlen(buffer), "right: %d\n", player->right );
+		sprintf(buffer + strlen(buffer), "lastUp: %d\n", player->lastUp );
+		sprintf(buffer + strlen(buffer), "lastLeft: %d\n", player->lastLeft );
+		sprintf(buffer + strlen(buffer), "lastRight: %d\n", player->lastRight );
+		sprintf(buffer + strlen(buffer), "run: %d\n", player->run );
+		sprintf(buffer + strlen(buffer), "canJump: %d\n", player->canJump );
+		sprintf(buffer + strlen(buffer), "bhop: %d\n", player->bhop );
+		sprintf(buffer + strlen(buffer), "inAir: %d\n", player->inAir );
+		sprintf(buffer + strlen(buffer), "timeAlive: %d\n", player->timeAlive );
+		sprintf(buffer + strlen(buffer), "size: %d\n", player->size );
 	}
 }
 
-float player_posX(Player *player){
-	return player->posX;
-};
-float player_posY(Player *player){
-	return player->posY;
-};

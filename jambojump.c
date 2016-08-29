@@ -8,13 +8,23 @@
 
 // Real global constants i guess
 
+// left right up down z x character inputs
+// + - change size
+// . Pause action
+// 0 step action
+
+
 int used_solids = 0;
 char const background_color[] = {0xd9,0xd9,0xd9};
 char const grid_color[] = {0xd0,0xd0,0xd0};
 char const solid_color[] = {0x00,0x00,0x00};
-SDL_Color conColor = { 0, 0, 0 };
+SDL_Color conColor = { 0x66, 0xaa, 0xaa };
 
 bool running = false;
+bool active = true;
+
+float solidSpawnX = 0;
+float solidSpawnY = 0;
 
 float scrollPosX = 0;
 float scrollPosY = 0;
@@ -33,8 +43,8 @@ SDL_Surface* surface = NULL;
 
 SDL_Rect map[SOLID_COUNT];
 
-struct Player *player;
-struct Console *con;
+Player player;
+static Console con;
 
 //end constants
 
@@ -54,7 +64,7 @@ bool init(){
 		else
 		{
 			if(TTF_Init()==-1) {
-			    printf( "SDL_TTF could not initialize! TTF_Error: %s\n", TTF_GetError() );
+				printf( "SDL_TTF could not initialize! TTF_Error: %s\n", TTF_GetError() );
 			} else {
 				surface = SDL_GetWindowSurface( window );
 				success = true;
@@ -78,17 +88,8 @@ void console_loadfont(Console *console, TTF_Font *font){
 	console->font = font;
 }
 
-bool load(){
-	//Loading success 
-	bool success = true;
-	success = player_initplayer(&player);
-	//printf("Initializing console\n");
-	//Console *newconsole = {{0}, NULL, NULL, NULL};
-	//con = newconsole;
-	//printf("Console initialized, loading font from mem\n");
-	//console_loadfont(&con, TTF_OpenFontRW(SDL_RWFromConstMem(fontdata, FONT_DATA_LEN), 1, 9));
-	//con->font =  TTF_OpenFontRW(SDL_RWFromConstMem(fontdata, FONT_DATA_LEN), 1, 9);
-	//printf("Font loaded\n");
+void init_map(){
+	used_solids = 0;
 	//init blocks
 	for(int i = 0; i < SOLID_COUNT; i++){
 		map[i].x = 0;
@@ -111,6 +112,21 @@ bool load(){
 	add_solid(100, 350, 100, 10);
 	add_solid(300, 300, 500, 200);
 	add_solid(300, 10, 500, 200);
+}
+
+bool load(){
+	//Loading success 
+	bool success = true;
+	success = player_initplayer(&player);
+	printf("Initializing console\n");
+	Console newconsole = {{0}, NULL, NULL, NULL};
+	con = newconsole;
+	printf("Console initialized, loading font from mem\n");
+	//console_loadfont(con, TTF_OpenFontRW(SDL_RWFromConstMem(fontdata, FONT_DATA_LEN), 1, 9));
+	con.font =  TTF_OpenFontRW(SDL_RWFromConstMem(fontdata, FONT_DATA_LEN), 1, FONT_SIZE);
+	printf("Font loaded\n");
+
+	init_map();
 
 	return success;
 };
@@ -145,16 +161,26 @@ void draw(){
 	}
 	player_draw(&player, surface, scrollPosX, scrollPosY);
 
-	//con->surface = TTF_RenderUTF8_Solid( con->font, con->buffer, conColor );
-	//con->texture = SDL_CreateTextureFromSurface( renderer, con->surface );
-	//SDL_RenderCopy(renderer, con->texture, NULL, &con->surface->clip_rect);
-	//memset(con->buffer, 0, 1024);
+	char *line = strtok(con.buffer, "\n");
+	int linecount = 0;
+	while(line)
+	{
+		con.surface = TTF_RenderUTF8_Solid( con.font, line, conColor );
+		con.texture = SDL_CreateTextureFromSurface( renderer, con.surface );
+		SDL_Rect lineRect = con.surface->clip_rect;
+		lineRect.y += (FONT_SIZE+1)*linecount;
+		SDL_RenderCopy(renderer, con.texture, NULL, &lineRect);
+		linecount++;
+		line = strtok(NULL, "\n");
+	}
+
+	memset(con.buffer, 0, 1024);
 	SDL_UpdateWindowSurface( window );
 };
 
 void step(){
 	SDL_Event e;
-	//strncpy(&con->buffer, "test string123123", 11);
+	bool step = false;
 	//printf("Polling input\n");
 	while( SDL_PollEvent( &e ) != 0 ){
 		//User requests quit
@@ -169,31 +195,80 @@ void step(){
 				case SDLK_ESCAPE:
 				player_die(&player);
 				break;
+				case SDLK_KP_PLUS:
+				player.size += 1;
+				player.posY -= 1;
+				player_initsprite(&player);
+				break;
+				case SDLK_KP_MINUS:
+				player.size -= 1;
+				player_initsprite(&player);
+				break;
+				case SDLK_KP_3:
+				init_map();
+				break;
+				case SDLK_KP_0:
+				step = true;
+				break;
+				case SDLK_KP_PERIOD:
+				if(active){
+					active = false;
+				} else {
+					active = true;
+				}
+				break;
 				default:
 				break;
 			}
 		}
+		//If a mouse button was pressed
+		if( e.type == SDL_MOUSEBUTTONDOWN )
+		{
+			//If the left mouse button was pressed
+			if( e.button.button == SDL_BUTTON_LEFT )
+			{
+				//Get the mouse offsets
+				solidSpawnX = e.button.x + scrollPosX;
+				solidSpawnY = e.button.y + scrollPosY;
+			}
+		}
+		if( e.type == SDL_MOUSEBUTTONUP )
+		{
+			//If the left mouse button was released
+			if( e.button.button == SDL_BUTTON_LEFT )
+			{ 
+				if(solidSpawnX != 0){
+					float solidSpawnW = (e.button.x + scrollPosX) - solidSpawnX;
+					float solidSpawnH = (e.button.y + scrollPosY) - solidSpawnY;
+					add_solid(solidSpawnX, solidSpawnY, solidSpawnW, solidSpawnH);
+					solidSpawnX = 0;
+					solidSpawnY = 0;
+				}
+			}
+		}
 		//printf("Event processed\n");
 	}
-	//printf("Passing input to player\n");	
-	player_input(&player);
-	//printf("Beginning player step\n");
-	player_step(&player, &map, SOLID_COUNT);
+	if(active||step){
+		//printf("Passing input to player\n");	
+		player_input(&player);
+		//printf("Beginning player step\n");
+		player_step(&player, &map, SOLID_COUNT);
+	}
 	//printf("Player step complete\n");
 	//move the camera
 	float centerX = (scrollPosX+(SCREEN_WIDTH/2));
 	float centerY = (scrollPosY+(SCREEN_HEIGHT/2));
-	if(player_posX(&player) + scrollBoundL < centerX){
-		scrollPosX -= centerX - (player_posX(&player) + scrollBoundL);
+	if(player.posX + scrollBoundL < centerX){
+		scrollPosX -= centerX - (player.posX + scrollBoundL);
 	}
-	if(player_posX(&player) - scrollBoundR > centerX){
-		scrollPosX += (player_posX(&player) - scrollBoundR) - centerX;
+	if(player.posX - scrollBoundR > centerX){
+		scrollPosX += (player.posX - scrollBoundR) - centerX;
 	}
-	if(player_posY(&player) + scrollBoundU < centerY){
-		scrollPosY -= centerY - (player_posY(&player) + scrollBoundU);
+	if(player.posY + scrollBoundU < centerY){
+		scrollPosY -= centerY - (player.posY + scrollBoundU);
 	}
-	if(player_posY(&player) - scrollBoundD > centerY){
-		scrollPosY += (player_posY(&player) - scrollBoundD) - centerY;
+	if(player.posY - scrollBoundD > centerY){
+		scrollPosY += (player.posY - scrollBoundD) - centerY;
 	}
 };
 
@@ -245,6 +320,10 @@ int main( int argc, char* args[] )
 			avgFPS = 0;
 		} //need some kind of in-window console output for debuggings
 		//printf("%d/%f=%f:%f;%f\r", countedFrames,tickstart,avgFPS,scrollPosX,scrollPosY);
+		sprintf(con.buffer + strlen(con.buffer), "Frames/Ticks: %d/%f\n", countedFrames,tickstart);
+		sprintf(con.buffer + strlen(con.buffer), "Avg FPS: %f\n", avgFPS);
+		sprintf(con.buffer + strlen(con.buffer), "ScrollPos: %f;%f\n", scrollPosX,scrollPosY);
+		player_debug(&player, con.buffer);
 		countedFrames++;
 	}
 	printf("\nExiting...");
