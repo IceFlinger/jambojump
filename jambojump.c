@@ -1,8 +1,42 @@
-//Using SDL and standard IO
 #include <SDL.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <SDL_ttf.h>
+#include "fontData.h"
 #include "jambojump.h"
+#include "player.h"
+
+// Real global constants i guess
+
+int used_solids = 0;
+char const background_color[] = {0xd9,0xd9,0xd9};
+char const grid_color[] = {0xd0,0xd0,0xd0};
+char const solid_color[] = {0x00,0x00,0x00};
+SDL_Color conColor = { 0, 0, 0 };
+
+bool running = false;
+
+float scrollPosX = 0;
+float scrollPosY = 0;
+float scrollBoundL = SCROLL_BOUND_L;
+float scrollBoundR = SCROLL_BOUND_R;
+float scrollBoundU = SCROLL_BOUND_U;
+float scrollBoundD = SCROLL_BOUND_D;
+
+
+//The window we'll be rendering to
+SDL_Window* window = NULL;
+
+//The surface contained by the window
+SDL_Surface* surface = NULL;
+
+
+SDL_Rect map[SOLID_COUNT];
+
+struct Player *player;
+struct Console *con;
+
+//end constants
 
 bool init(){
 	bool success = false;
@@ -19,25 +53,42 @@ bool init(){
 		}
 		else
 		{
-			surface = SDL_GetWindowSurface( window );
-			success = true;
+			if(TTF_Init()==-1) {
+			    printf( "SDL_TTF could not initialize! TTF_Error: %s\n", TTF_GetError() );
+			} else {
+				surface = SDL_GetWindowSurface( window );
+				success = true;
+			}
 		}
 	}
 	return success;
 };
 
 void add_solid(int x, int y, int w, int h){
-	map[used_solids].x = x;
-	map[used_solids].y = y;
-	map[used_solids].w = w;
-	map[used_solids].h = h;
-	used_solids++;
+	if(used_solids<SOLID_COUNT){
+		map[used_solids].x = x;
+		map[used_solids].y = y;
+		map[used_solids].w = w;
+		map[used_solids].h = h;
+		used_solids++;
+	}
+}
+
+void console_loadfont(Console *console, TTF_Font *font){
+	console->font = font;
 }
 
 bool load(){
 	//Loading success 
 	bool success = true;
 	success = player_initplayer(&player);
+	//printf("Initializing console\n");
+	//Console *newconsole = {{0}, NULL, NULL, NULL};
+	//con = newconsole;
+	//printf("Console initialized, loading font from mem\n");
+	//console_loadfont(&con, TTF_OpenFontRW(SDL_RWFromConstMem(fontdata, FONT_DATA_LEN), 1, 9));
+	//con->font =  TTF_OpenFontRW(SDL_RWFromConstMem(fontdata, FONT_DATA_LEN), 1, 9);
+	//printf("Font loaded\n");
 	//init blocks
 	for(int i = 0; i < SOLID_COUNT; i++){
 		map[i].x = 0;
@@ -66,10 +117,10 @@ bool load(){
 
 void draw(){
 	SDL_FillRect( surface, NULL, SDL_MapRGB( surface->format, background_color[0], background_color[1], background_color[2]) );
+	SDL_Renderer *renderer = SDL_CreateSoftwareRenderer(surface);
 	if(ENABLE_GRID){
 		int horzLines = ceil(SCREEN_WIDTH/PLAYER_SIZE);
 		int vertLines = ceil(SCREEN_HEIGHT/PLAYER_SIZE);
-		SDL_Renderer *renderer = SDL_CreateSoftwareRenderer(surface);
 		SDL_SetRenderDrawColor( renderer, grid_color[0], grid_color[1], grid_color[2] , 0xFF); 
 		for (int i = 0; i <= horzLines; i++){
 			float x1 = PLAYER_SIZE*i - (int)scrollPosX%PLAYER_SIZE;
@@ -93,11 +144,17 @@ void draw(){
 		}
 	}
 	player_draw(&player, surface, scrollPosX, scrollPosY);
+
+	//con->surface = TTF_RenderUTF8_Solid( con->font, con->buffer, conColor );
+	//con->texture = SDL_CreateTextureFromSurface( renderer, con->surface );
+	//SDL_RenderCopy(renderer, con->texture, NULL, &con->surface->clip_rect);
+	//memset(con->buffer, 0, 1024);
 	SDL_UpdateWindowSurface( window );
 };
 
 void step(){
 	SDL_Event e;
+	//strncpy(&con->buffer, "test string123123", 11);
 	//printf("Polling input\n");
 	while( SDL_PollEvent( &e ) != 0 ){
 		//User requests quit
@@ -121,7 +178,7 @@ void step(){
 	//printf("Passing input to player\n");	
 	player_input(&player);
 	//printf("Beginning player step\n");
-	player_step(&player, &map);
+	player_step(&player, &map, SOLID_COUNT);
 	//printf("Player step complete\n");
 	//move the camera
 	float centerX = (scrollPosX+(SCREEN_WIDTH/2));
@@ -143,7 +200,7 @@ void step(){
 void quit(){
 	//Destroy window
 	SDL_DestroyWindow( window );
-
+	TTF_Quit();
 	//Quit SDL subsystems
 	SDL_Quit();
 };
@@ -161,6 +218,7 @@ int main( int argc, char* args[] )
 		printf("Failed to load image data\n");
 		return 1;
 	}
+	printf("Loaded %d/%d solids\n", used_solids, SOLID_COUNT);
 	printf("Loaded and running...\n");
 	running = true;
 	int countedFrames = 0;
@@ -170,6 +228,7 @@ int main( int argc, char* args[] )
 		step();
 		//printf( "Done tick, drawing\n");
 		draw();
+		//player_debug(&player);
 		//printf( "Done drawing, continuing\n");
 		float tickend = SDL_GetTicks();
 		float frameticks = tickend - tickstart;
@@ -177,7 +236,7 @@ int main( int argc, char* args[] )
 			{
 				float timeout =SDL_GetTicks() + ((1000/SCREEN_FPS)-frameticks);
 				while (!SDL_TICKS_PASSED(SDL_GetTicks(), timeout)) {
-					//player_debug(&player);
+					
 				}
 			}
 		//Calculate and correct fps

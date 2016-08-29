@@ -17,7 +17,7 @@ COMPILER_FLAGS = -w
 #COMPILER_FLAGS = -w
 
 #LINKER_FLAGS specifies the libraries we're linking against
-LINKER_FLAGS = 
+LINKER_FLAGS = -lSDL2_ttf -lfreetype -lbz2
 #OBJ_NAME specifies the name of our exectuable
 OBJ_NAME = jambojump
 

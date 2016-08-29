@@ -1,6 +1,7 @@
 //Using SDL and standard IO
 #include <SDL.h>
 #include <stdio.h>
+#include <SDL_ttf.h>
 #include <stdbool.h>
 #include "player.h"
 
@@ -75,7 +76,7 @@ bool player_input(Player *player){
 	player->right = currentKeyStates[ SDL_SCANCODE_RIGHT ];
 	player->run = currentKeyStates[ SDL_SCANCODE_Z ];
 };
-bool player_step(Player *player, SDL_Rect *map){
+bool player_step(Player *player, SDL_Rect *map, int map_size){
 	if(player->run){
 		player->speed = PLAYER_SPEED * PLAYER_RUN_MOD;
 	} else {
@@ -194,7 +195,7 @@ bool player_step(Player *player, SDL_Rect *map){
 	player->posY += player->velY;
 	player->posX += player->velX;
 	//printf("Checking solid collision\n");
-	for(int i = 0; i < SOLID_COUNT; i++){
+	for(int i = 0; i < map_size; i++){
 		//(playeredge)(solidedge)(playeredge)
 		//printf("Checking solid %d\n", i);
 		if (map[i].w != 0){
@@ -285,8 +286,7 @@ void player_die(Player *player){
 
 void player_debug(Player *player){
 	if(PLAYER_DEBUG){
-		printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
-		printf("spawnX: %f\n", player->spawnX );
+		printf("\n\n\n\n\n\n\n\n\n\n\n\nspawnX: %f\n", player->spawnX );
 		printf("posX: %f\n", player->posX );
 		printf("velX: %f\n", player->velX );
 		printf("targVelX: %f\n", player->targVelX );

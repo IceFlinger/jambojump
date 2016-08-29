@@ -1,8 +1,6 @@
 #ifndef JAMBOPLAYER
 #define JAMBOPLAYER
 
-#include "glob.h"
-
 #define PLAYER_SIZE 24
 #define PLAYER_SPEED 4
 #define PLAYER_SPAWNX 30
@@ -67,7 +65,7 @@ bool player_draw(Player *player, SDL_Surface *surface, float offsetPosX, float o
 bool player_input(Player *player);
 void player_die(Player *player);
 void player_debug(Player *player);
-bool player_step(Player *player, SDL_Rect *map);
+bool player_step(Player *player, SDL_Rect *map, int map_size);
 float player_posX(Player *player);
 float player_posY(Player *player);
 
