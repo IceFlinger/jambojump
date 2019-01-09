@@ -5,19 +5,19 @@ OBJS = jambojump.c player.c
 CC = emcc
 
 #INCLUDE_PATHS specifies the additional include paths we'll need
-INCLUDE_PATHS = -I/usr/include/SDL2 -D_REENTRANT
+INCLUDE_PATHS = -D_REENTRANT
 
 #LIBRARY_PATHS specifies the additional library paths we'll need
-LIBRARY_PATHS = -lSDL2 -Wl,--no-undefined -lm -ldl -lpthread -lrt
+LIBRARY_PATHS = -Wl,--no-undefined -lm -ldl -lpthread -lrt
 
 #COMPILER_FLAGS specifies the additional compilation options we're using
 # -w suppresses all warnings
 # -Wl,-subsystem,windows gets rid of the console window
-COMPILER_FLAGS = -w -s USE_SDL=2 -s USE_SDL_TTF=2 -s ALLOW_MEMORY_GROWTH=1
+COMPILER_FLAGS = -s USE_SDL=2 -s USE_SDL_TTF=2 -s ALLOW_MEMORY_GROWTH=1
 #COMPILER_FLAGS = -w
 
 #LINKER_FLAGS specifies the libraries we're linking against
-LINKER_FLAGS = -lfreetype -lbz2 --emrun
+LINKER_FLAGS = --emrun --shell-file shell.html
 #OBJ_NAME specifies the name of our exectuable
 OBJ_NAME = jambojump.html
 

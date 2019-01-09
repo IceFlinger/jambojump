@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <SDL_ttf.h>
+#include <emscripten/emscripten.h>
+#include <limits.h>
 #include "fontData.h"
 #include "jambojump.h"
 #include "player.h"
@@ -34,6 +36,8 @@ bool solidDrawing = false;
 int SCREEN_WIDTH = INIT_SCREEN_WIDTH;
 int SCREEN_HEIGHT = INIT_SCREEN_HEIGHT;
 
+int countedFrames = 0;
+
 float scrollPosX = 0;
 float scrollPosY = 0;
 float scrollBoundL = SCROLL_BOUND_L;
@@ -64,7 +68,7 @@ bool init(){
 	}
 	else
 	{
-		window = SDL_CreateWindow( "Jambojump", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+		window = SDL_CreateWindow( "Jambojump", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
 		if( window == NULL )
 		{
 			printf( "Window could not be created! SDL_Error: %s\n", SDL_GetError() );
@@ -115,7 +119,7 @@ void init_map(){
 	}
 //	add_solid(SCREEN_WIDTH/4, 500, SCREEN_WIDTH/2, 30);
 	add_solid(-200, 0.0, 210, 600); //lay out some basic shapes
-	add_solid(900, 0.0, 800, 600);
+	add_solid(900, 0.0, INT_MAX/2, 600);
 	add_solid(10, 590, 400, 10);
 	add_solid(700, 590, 200, 10);
 	add_solid(700, 600, 10, 500);
@@ -203,6 +207,7 @@ void draw(){
 		memset(con.buffer, 0, 1024);
 	}
 	SDL_UpdateWindowSurface( window );
+	SDL_DestroyRenderer(renderer);
 };
 
 void step(){
@@ -270,8 +275,8 @@ void step(){
 				{
 					//Get the mouse offsets
 					if(GRID_SNAP){
-						solidSpawnX = floor((e.button.x + scrollPosX)/grid_size)*grid_size;
-						solidSpawnY = floor((e.button.y + scrollPosY)/grid_size)*grid_size;
+						solidSpawnX = round((e.button.x + scrollPosX)/grid_size)*grid_size;
+						solidSpawnY = round((e.button.y + scrollPosY)/grid_size)*grid_size;
 					} else {
 						solidSpawnX = e.button.x + scrollPosX;
 						solidSpawnY = e.button.y + scrollPosY;
@@ -288,8 +293,8 @@ void step(){
 						float solidSpawnW;
 						float solidSpawnH;
 						if(GRID_SNAP){
-							solidSpawnW = (floor((e.button.x + scrollPosX)/grid_size)*grid_size) - solidSpawnX;
-							solidSpawnH = (floor((e.button.y + scrollPosY)/grid_size)*grid_size) - solidSpawnY;
+							solidSpawnW = (round((e.button.x + scrollPosX)/grid_size)*grid_size) - solidSpawnX;
+							solidSpawnH = (round((e.button.y + scrollPosY)/grid_size)*grid_size) - solidSpawnY;
 						} else {
 							solidSpawnW = (e.button.x + scrollPosX) - solidSpawnX;
 							solidSpawnH = (e.button.y + scrollPosY) - solidSpawnY;
@@ -302,15 +307,15 @@ void step(){
 				}
 			}
 		}
-		if( e.type == SDL_WINDOWEVENT ){
-			switch( e.window.event ){
-				case SDL_WINDOWEVENT_SIZE_CHANGED:
-				SCREEN_WIDTH = e.window.data1;
-				SCREEN_HEIGHT = e.window.data2;
-				surface = SDL_GetWindowSurface( window );
-				break;
-			}
-		}
+		//if( e.type == SDL_WINDOWEVENT ){
+		//	switch( e.window.event ){
+		//		case SDL_WINDOWEVENT_SIZE_CHANGED:
+		//		SCREEN_WIDTH = e.window.data1;
+		//		SCREEN_HEIGHT = e.window.data2;
+		//		surface = SDL_GetWindowSurface( window );
+		//		break;
+		//	}
+		//}
 		//printf("Event processed\n");
 	}
 	if(active||step){
@@ -345,6 +350,38 @@ void quit(){
 	SDL_Quit();
 };
 
+void game_iter() {
+	float tickstart = SDL_GetTicks();
+	//printf( "Entering tick loop\n");
+	step();
+	draw();
+	//player_debug(&player);
+	//printf( "Done drawing, continuing\n");
+	float tickend = SDL_GetTicks();
+	float frameticks = tickend - tickstart;
+	if( frameticks < (1000/SCREEN_FPS) )
+		{
+			float timeout =SDL_GetTicks() + ((1000/SCREEN_FPS)-frameticks);
+			while (!SDL_TICKS_PASSED(SDL_GetTicks(), timeout)) {
+				
+			}
+		}
+	//Calculate and correct fps
+	float avgFPS = countedFrames / ( tickstart / 1000.0 );
+	if( avgFPS > 2000000 ){
+		avgFPS = 0;
+	} //need some kind of in-window console output for debuggings
+	//printf("%d/%f=%f:%f;%f\r", countedFrames,tickstart,avgFPS,scrollPosX,scrollPosY);
+	if(DEBUG){
+		sprintf(con.buffer + strlen(con.buffer), "Frames/Ticks: %d/%f\n", countedFrames,tickstart);
+		sprintf(con.buffer + strlen(con.buffer), "Avg FPS: %f\n", avgFPS);
+		sprintf(con.buffer + strlen(con.buffer), "Solids: %d/%d\n", used_solids, SOLID_COUNT);
+		sprintf(con.buffer + strlen(con.buffer), "ScrollPos: %f;%f\n", scrollPosX,scrollPosY);
+		player_debug(&player, con.buffer);
+	}
+	countedFrames++;
+}
+
 int main( int argc, char* args[] )
 {
 	printf("Starting...\n");
@@ -360,40 +397,14 @@ int main( int argc, char* args[] )
 	}
 	printf("Init %d/%d solids\n", used_solids, SOLID_COUNT);
 	printf("Loaded and running...\n");
+	#ifdef __EMSCRIPTEN__
+	emscripten_set_main_loop(game_iter, 0, 1);
+	#else
 	running = true;
-	int countedFrames = 0;
 	while(running){
-		float tickstart = SDL_GetTicks();
-		//printf( "Entering tick loop\n");
-		step();
-		//printf( "Done tick, drawing\n");
-		draw();
-		//player_debug(&player);
-		//printf( "Done drawing, continuing\n");
-		float tickend = SDL_GetTicks();
-		float frameticks = tickend - tickstart;
-		if( frameticks < (1000/SCREEN_FPS) )
-			{
-				float timeout =SDL_GetTicks() + ((1000/SCREEN_FPS)-frameticks);
-				while (!SDL_TICKS_PASSED(SDL_GetTicks(), timeout)) {
-					
-				}
-			}
-		//Calculate and correct fps
-		float avgFPS = countedFrames / ( tickstart / 1000.0 );
-		if( avgFPS > 2000000 ){
-			avgFPS = 0;
-		} //need some kind of in-window console output for debuggings
-		//printf("%d/%f=%f:%f;%f\r", countedFrames,tickstart,avgFPS,scrollPosX,scrollPosY);
-		if(DEBUG){
-			sprintf(con.buffer + strlen(con.buffer), "Frames/Ticks: %d/%f\n", countedFrames,tickstart);
-			sprintf(con.buffer + strlen(con.buffer), "Avg FPS: %f\n", avgFPS);
-			sprintf(con.buffer + strlen(con.buffer), "Solids: %d/%d\n", used_solids, SOLID_COUNT);
-			sprintf(con.buffer + strlen(con.buffer), "ScrollPos: %f;%f\n", scrollPosX,scrollPosY);
-			player_debug(&player, con.buffer);
-		}
-		countedFrames++;
+		game_iter();
 	}
+	#endif
 	printf("\nExiting...");
 	quit();
 	return 0;
