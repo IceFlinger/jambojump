@@ -25,7 +25,7 @@ bool player_initplayer(Player *player){
 		PLAYER_SPAWNX,	//posX
 		0,				//velX
 		0,				//targVelX
-		1.5,			//velchangeX
+		0,				//velchangeX
 		0,				//gravX
 		0,				//targCountX
 		0,				//jumpChangeX
@@ -33,12 +33,10 @@ bool player_initplayer(Player *player){
 		PLAYER_SPAWNY,	//spawnY
 		PLAYER_SPAWNY,	//posY
 		0,				//velY
-		PLAYER_AIR_GRAV,//gravY
 		0,				//targVelY
-		1.2,			//velchangeY 1.2
-		0,				//targCountY
 
 		PLAYER_SPEED,	//speed
+		false,			//jump
 		false,			//up
 		false,			//down
 		false,			//left
@@ -50,6 +48,8 @@ bool player_initplayer(Player *player){
 		false,			//canJump
 		false,			//bhop
 		false,			//inAir
+		false,			//onFloor
+		false,			//onWall
 		0,				//timeAlive
 		PLAYER_SIZE 	//size
 	};
@@ -74,7 +74,8 @@ bool player_draw(Player *player, SDL_Surface *surface, float offsetPosX, float o
 
 bool player_input(Player *player){
 	const Uint8* currentKeyStates = SDL_GetKeyboardState( NULL );
-	player->up = currentKeyStates[ SDL_SCANCODE_X ];
+	player->jump = currentKeyStates[ SDL_SCANCODE_X ];
+	player->up = currentKeyStates[ SDL_SCANCODE_UP ];
 	player->down = currentKeyStates[ SDL_SCANCODE_DOWN ];
 	player->left = currentKeyStates[ SDL_SCANCODE_LEFT ];
 	player->right = currentKeyStates[ SDL_SCANCODE_RIGHT ];
@@ -87,12 +88,11 @@ bool player_step(Player *player, SDL_Rect *map, int map_size){
 		player->speed = PLAYER_SPEED;
 	}
 	player->timeAlive++;
-	player->targVelY = player->gravY;
-	player->targVelX = player->gravX;
-	player->targCountY = 0.0;
 
-	if(player->up && player->canJump){
-		if (player->velY > PLAYER_SOFT_JUMP_THRES){
+	player->targVelX = player->gravX + player->jumpChangeX*player->inAir;
+
+	if(player->jump && player->canJump){
+		if ((player->onWall)&&!(player->up||player->right||player->left)){
 			player->velY = PLAYER_SOFT_JUMP_SPEED;
 		} else {
 			player->velY = PLAYER_JUMP_SPEED;
@@ -101,9 +101,6 @@ bool player_step(Player *player, SDL_Rect *map, int map_size){
 			player->velX = player->jumpChangeX;
 		}
 		player->canJump = false;
-		if (!(player->lastUp)){
-			player->targCountY = 0.0;
-		}
 	}
 
 	if(player->left && player->right){
@@ -126,7 +123,7 @@ bool player_step(Player *player, SDL_Rect *map, int map_size){
 		}
 	}
 
-	if(!(player->up) && player->lastUp && (player->velY < 0.0) && (player->jumpChangeX == 0.0)){
+	if(!(player->jump) && player->lastJump && (player->velY < 0.0) && (player->jumpChangeX == 0.0)){
 		//Reduce our upwards speed if we release the button while rising
 		player->velY = PLAYER_EARLY_DROP_SPEED; 
 	}
@@ -135,32 +132,35 @@ bool player_step(Player *player, SDL_Rect *map, int map_size){
 		player->targCountX = 0.0;
 	}
 
-	player->lastUp = player->up;
+	player->lastJump = player->jump;
 	player->lastLeft = player->left;
 	player->lastRight = player->right;
+
 	
 	if(player->velY != player->targVelY){
-		if (player->targCountY == 0.0){
-			player->targCountY = PLAYER_VETICAL_FRICTION;//0.5
-		} else{
-			player->targCountY *= player->velChangeY;
-		}
 		float oldVelY = player->velY;
 		if(player->velY < player->targVelY){
-			player->velY += player->targCountY;
+			player->velY += PLAYER_VETICAL_FRICTION;
 			if(player->velY > player->targVelY){
 				player->velY = player->targVelY;
-				player->targCountY = 0.0;
 			}
 		} else {
-			player->velY -= player->targCountY;
+			player->velY -= PLAYER_VETICAL_FRICTION;
 			if(player->velY < player->targVelY){
 				player->velY = player->targVelY;
-				player->targCountY = 0.0;
 			}
 		}
-		if (oldVelY * player->velY < 0.0){
-			player->targCountY = 0.0;
+	}
+
+	//cancel air momentum if pushing opposite way
+	/*if(((((player->targVelX)*(player->velX)) < 0)&&player->inAir)&&(abs(player->velX)<abs(player->jumpChangeX-player->velChangeX))){
+		player->jumpChangeX = 0;
+	}*/
+	if(fabs(player->velX)<fabs(player->jumpChangeX)){
+		if (player->jumpChangeX<0){
+			player->jumpChangeX = -fabs(player->velX);
+		} else {
+			player->jumpChangeX = fabs(player->velX);
 		}
 	}
 	
@@ -193,6 +193,8 @@ bool player_step(Player *player, SDL_Rect *map, int map_size){
 		}
 	}
 
+
+
 	bool collided = false;
 	float oldX = player->posX;
 	float oldY = player->posY;
@@ -211,6 +213,8 @@ bool player_step(Player *player, SDL_Rect *map, int map_size){
 						player->posY = map[i].y - player->size;
 						player->velY = 0.0;
 						collided = true;
+						player->onFloor = true;
+						player->onWall = false;
 						player->jumpChangeX = 0.0;
 					}
 					//bottom edge
@@ -228,6 +232,7 @@ bool player_step(Player *player, SDL_Rect *map, int map_size){
 						if (!collided){
 							player->jumpChangeX = -PLAYER_WALLJUMP_XSPEED;
 							collided = true;
+							player->onWall = true;
 						}
 						player->velX = PLAYER_WALL_STICKINESS; //stick towards the wall
 					}
@@ -240,6 +245,7 @@ bool player_step(Player *player, SDL_Rect *map, int map_size){
 						if(!collided){
 							player->jumpChangeX = PLAYER_WALLJUMP_XSPEED;
 							collided = true;
+							player->onWall = true;
 						}
 						player->velX = -PLAYER_WALL_STICKINESS; //works anywhere between 0.01 and 1.9 but not more?
 					}
@@ -248,7 +254,7 @@ bool player_step(Player *player, SDL_Rect *map, int map_size){
 		}
 	}
 	if(collided){
-		if(!player->lastUp){
+		if(!player->lastJump){
 			//avoid bouncing
 			player->canJump = true;
 		} else if (player->bhop) {
@@ -263,18 +269,24 @@ bool player_step(Player *player, SDL_Rect *map, int map_size){
 		}
 		player->velChangeX = 2.0;
 		player->inAir = false;
-		player->gravY = PLAYER_WALL_GRAV;
+		if(player->up||player->right||player->left){
+			player->targVelY = PLAYER_WALL_GRAV;
+		} else{
+			player->targVelY = PLAYER_AIR_GRAV;
+		}
 	} else {
 		player->canJump = false;
 		//not holding jump and falling, enable bhop next landing
-		//if(!(player->up)&&(player->velY > 0)){
-		if(!(player->up)){
+		//if(!(player->jump)&&(player->velY > 0)){
+		if((!(player->jump))&&(player->velY > 0)){
 			player->bhop = true;
 		}
 		player->gravX = 0.0;
 		player->velChangeX = 1.0;
 		player->inAir = true;
-		player->gravY = PLAYER_AIR_GRAV;
+		player->onFloor = false;
+		player->onWall = false;
+		player->targVelY = PLAYER_AIR_GRAV;
 	}
 	//printf("Checked collision\n");
 
@@ -302,23 +314,23 @@ void player_debug(Player *player, char *buffer){
 		sprintf(buffer + strlen(buffer), "spawnY: %f\n", player->spawnY );
 		sprintf(buffer + strlen(buffer), "posY: %f\n", player->posY );
 		sprintf(buffer + strlen(buffer), "velY: %f\n", player->velY );
-		sprintf(buffer + strlen(buffer), "gravY: %f\n", player->gravY );
 		sprintf(buffer + strlen(buffer), "targVelY: %f\n", player->targVelY );
-		sprintf(buffer + strlen(buffer), "velChangeY: %f\n", player->velChangeY );
-		sprintf(buffer + strlen(buffer), "targCountY: %f\n", player->targCountY );
 
 		sprintf(buffer + strlen(buffer), "speed: %f\n", player->speed );
+		sprintf(buffer + strlen(buffer), "jump: %d\n", player->jump );
 		sprintf(buffer + strlen(buffer), "up: %d\n", player->up );
 		sprintf(buffer + strlen(buffer), "down: %d\n", player->down );
 		sprintf(buffer + strlen(buffer), "left: %d\n", player->left );
 		sprintf(buffer + strlen(buffer), "right: %d\n", player->right );
-		sprintf(buffer + strlen(buffer), "lastUp: %d\n", player->lastUp );
+		sprintf(buffer + strlen(buffer), "lastJump: %d\n", player->lastJump );
 		sprintf(buffer + strlen(buffer), "lastLeft: %d\n", player->lastLeft );
 		sprintf(buffer + strlen(buffer), "lastRight: %d\n", player->lastRight );
 		sprintf(buffer + strlen(buffer), "run: %d\n", player->run );
 		sprintf(buffer + strlen(buffer), "canJump: %d\n", player->canJump );
 		sprintf(buffer + strlen(buffer), "bhop: %d\n", player->bhop );
 		sprintf(buffer + strlen(buffer), "inAir: %d\n", player->inAir );
+		sprintf(buffer + strlen(buffer), "onFloor: %d\n", player->onFloor );
+		sprintf(buffer + strlen(buffer), "onWall: %d\n", player->onWall );
 		sprintf(buffer + strlen(buffer), "timeAlive: %d\n", player->timeAlive );
 		sprintf(buffer + strlen(buffer), "size: %d\n", player->size );
 	}
