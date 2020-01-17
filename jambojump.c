@@ -2,11 +2,14 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <SDL_ttf.h>
-#include <emscripten/emscripten.h>
 #include <limits.h>
 #include "fontData.h"
 #include "jambojump.h"
 #include "player.h"
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
 
 // Real global constants i guess
 

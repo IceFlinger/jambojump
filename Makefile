@@ -8,3 +8,5 @@ unix:
 	make -f Makefile.unix
 wasm:
 	make -f Makefile.wasm
+macos:
+	make -f Makefile.macos
